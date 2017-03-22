@@ -1,13 +1,26 @@
 package net.talvi.batchpdfconvert;
 
 import com.sun.star.beans.PropertyValue;
+import com.sun.star.beans.PropertyVetoException;
+import com.sun.star.beans.UnknownPropertyException;
+import com.sun.star.beans.XPropertySet;
 import com.sun.star.comp.helper.Bootstrap;
 import com.sun.star.comp.helper.BootstrapException;
+import com.sun.star.container.XIndexAccess;
+import com.sun.star.drawing.XDrawPage;
+import com.sun.star.drawing.XDrawPages;
+import com.sun.star.drawing.XDrawPagesSupplier;
+import com.sun.star.drawing.XShape;
 import com.sun.star.frame.XComponentLoader;
 import com.sun.star.frame.XDesktop;
 import com.sun.star.frame.XStorable;
+import com.sun.star.io.IOException;
+import com.sun.star.lang.IllegalArgumentException;
+import com.sun.star.lang.IndexOutOfBoundsException;
+import com.sun.star.lang.WrappedTargetException;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.XMultiComponentFactory;
+import com.sun.star.presentation.XPresentation;
 import com.sun.star.text.XTextDocument;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
@@ -69,11 +82,95 @@ public class BatchPdfConvert {
         return UnoRuntime.queryInterface(XTextDocument.class, component);
     }
     
-    public static void main(String[] argv) {
-	final XDesktop desktop = getDesktop();
+    public static XComponent loadDocument(String urlString, XDesktop desktop) {
+        try {
+        com.sun.star.frame.XComponentLoader xCompLoader =
+                UnoRuntime.queryInterface(
+                 com.sun.star.frame.XComponentLoader.class, desktop);
+        return xCompLoader.loadComponentFromURL(
+                urlString, "_blank", 0, new com.sun.star.beans.PropertyValue[0]);
+        } catch (IOException ex) {
+            ex.printStackTrace(System.err);
+            System.exit(1);
+        }
+        return null;
+    }
+    
+    public static void loadAndConvertOdp() {
+        final XDesktop desktop = getDesktop();
+        final XComponent xComp = loadDocument("file:///home/pont/Untitled 1.odp", desktop);
+        final XPresentation odpDoc = UnoRuntime.queryInterface(XPresentation.class, xComp);
+        
+        XDrawPagesSupplier xDPS = UnoRuntime.queryInterface(
+                XDrawPagesSupplier.class, xComp);
+        XDrawPages xDPn = xDPS.getDrawPages();
+        com.sun.star.container.XIndexAccess xDPi =
+                UnoRuntime.queryInterface(
+                com.sun.star.container.XIndexAccess.class, xDPn);
+        
+        int nPages = xDPn.getCount();
+        for (int i=0; i<nPages; i++) {
+            try {
+                XDrawPage page = UnoRuntime.queryInterface(
+                com.sun.star.drawing.XDrawPage.class, xDPi.getByIndex(i));
+                int nSomethings = page.getCount();
+                XIndexAccess dpia = UnoRuntime.queryInterface(XIndexAccess.class, page);
+                for (int j=0; j<nSomethings; j++) {
+                    XShape shape = UnoRuntime.queryInterface(XShape.class, dpia.getByIndex(j));
+                    System.out.println("Shape: "+shape.getShapeType());
+                    // com.sun.star.presentation.TitleTextShape
+                    // com.sun.star.presentation.SubtitleShape
+                    //if ("com.sun.star.presentation.TitleTextShape".equals(shape.getShapeType())) {
+                        XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, shape);
+                        shapeProps.setPropertyValue("Shadow", Boolean.FALSE);
+                    //}
+                }
+                
+            } catch (IndexOutOfBoundsException | WrappedTargetException |
+                    UnknownPropertyException | PropertyVetoException | IllegalArgumentException ex) {
+                ex.printStackTrace(System.err);
+                System.exit(1);
+            
+            }
+        }
+        
+        final XStorable storable = (XStorable)
+	    UnoRuntime.queryInterface(XStorable.class, xComp);
+
+	System.out.println("xStorable: " + storable);
+ 
+	final String outputUrlString = "file:///home/pont/exported.pdf";
+        
+        final PropertyValue[] filterData = {
+            //makePropVal("ReduceImageResolution", Boolean.TRUE),
+            //makePropVal("MaxImageResolution", 75),
+            makePropVal("UseLosslessCompression", Boolean.FALSE),
+            makePropVal("Quality", 10)
+           //     makePropVal("Watermark", "Wibble")
+        };
+        
+        // See http://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1frame_1_1XStorable.html
+	final PropertyValue[] saveOptions = {
+            makePropVal("FilterName", "impress_pdf_Export"), 
+            makePropVal("FilterData", filterData)
+        };
+        
+	try {
+	    storable.storeToURL(outputUrlString, saveOptions);
+	} catch (com.sun.star.io.IOException ex) {
+	    ex.printStackTrace(System.err);
+	    return;
+	}
+    }
+    
+    public static void createAndConvertText() {
+        	final XDesktop desktop = getDesktop();
         final XTextDocument textDoc = createTextDocument(desktop);
         
         textDoc.getText().setString("Hello world!");
+        
+        //final XComponent xComp = loadDocument("file:///home/pont/Untitled 1.odt", desktop);
+        //final XTextDocument textDoc = UnoRuntime.queryInterface(XTextDocument.class, xComp);
  
 	final XStorable storable = (XStorable)
 	    UnoRuntime.queryInterface(XStorable.class, textDoc);
@@ -98,5 +195,9 @@ public class BatchPdfConvert {
 	    ex.printStackTrace(System.err);
 	    return;
 	}
+    }
+    
+    public static void main(String[] argv) {
+        loadAndConvertOdp();
     }    
 }
