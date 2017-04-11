@@ -9,7 +9,6 @@ import com.sun.star.comp.helper.Bootstrap;
 import com.sun.star.comp.helper.BootstrapException;
 import com.sun.star.container.XIndexAccess;
 import com.sun.star.drawing.XDrawPage;
-import com.sun.star.drawing.XDrawPages;
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XShape;
 import com.sun.star.frame.XComponentLoader;
@@ -22,7 +21,6 @@ import com.sun.star.lang.IndexOutOfBoundsException;
 import com.sun.star.lang.WrappedTargetException;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.XMultiComponentFactory;
-import com.sun.star.presentation.XPresentation;
 import com.sun.star.text.XTextDocument;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.XComponentContext;
@@ -69,7 +67,7 @@ public class BatchPdfConvert {
         return pv;
     }
 
-    protected static XComponent createDocument(XDesktop desktop,
+    private static XComponent createDocument(XDesktop desktop,
             String docType) {
         final String urlString = "private:factory/" + docType;
         final PropertyValue emptyArgs[] = new PropertyValue[0];
@@ -110,12 +108,11 @@ public class BatchPdfConvert {
         System.out.println("Model: "+model);
         
         if (model != null) {
-            final XComponent disposable = (XComponent) queryInterface(
-                        XComponent.class, model);
+            final XComponent disposable =
+                    (XComponent) queryInterface(XComponent.class, model);
             // Proper document so close if possible.
             final XCloseable xCloseable =
-                    (XCloseable)queryInterface(
-                            XCloseable.class,model);
+                    (XCloseable) queryInterface(XCloseable.class, model);
             
             if (xCloseable != null) {
                 System.out.println("Closeable.");
@@ -157,25 +154,13 @@ public class BatchPdfConvert {
         }
     }
     
-    public static void loadAndConvertOdp(String inputPath, String outputPath) {
-        final XDesktop desktop = getDesktop();
-        String inputUrl = null;
-        String outputUrl = null;
-        try {
-            inputUrl = (new File(inputPath)).toURI().toURL().toString();
-            outputUrl = (new File(outputPath)).toURI().toURL().toString();
-        } catch (java.io.IOException ex) {
-            Logger.getLogger(BatchPdfConvert.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-        final XComponent xComp = loadDocument(inputUrl, desktop);
-        final XPresentation odpDoc = queryInterface(XPresentation.class, xComp);
+    private static void removeShadows(XComponent comp) {
+        final XDrawPagesSupplier xDPS =
+                queryInterface(XDrawPagesSupplier.class, comp);
+        final XIndexAccess xDPi =
+                queryInterface(XIndexAccess.class, xDPS.getDrawPages());
         
-        final XDrawPagesSupplier xDPS = queryInterface(XDrawPagesSupplier.class, xComp);
-        final XDrawPages xDPn = xDPS.getDrawPages();
-        final XIndexAccess xDPi = queryInterface(XIndexAccess.class, xDPn);
-        
-        for (int i=0; i<xDPn.getCount(); i++) {
+        for (int i=0; i<xDPS.getDrawPages().getCount(); i++) {
             try {
                 final XDrawPage page = queryInterface(XDrawPage.class, xDPi.getByIndex(i));
                 final XIndexAccess dpia = queryInterface(XIndexAccess.class, page);
@@ -195,17 +180,20 @@ public class BatchPdfConvert {
                 }
                 
             } catch (IndexOutOfBoundsException | WrappedTargetException |
-                    UnknownPropertyException | PropertyVetoException | IllegalArgumentException ex) {
+                    UnknownPropertyException | PropertyVetoException |
+                    IllegalArgumentException ex) {
                 ex.printStackTrace(System.err);
                 System.exit(1);
             }
         }
+    }
+    
+    private static void exportDocument(final XComponent comp, String outputUrl) {
+        final XStorable storable =
+                (XStorable) queryInterface(XStorable.class, comp);
         
-        final XStorable storable = (XStorable)
-                queryInterface(XStorable.class, xComp);
-
-	System.out.println("xStorable: " + storable);
-         
+        System.out.println("xStorable: " + storable);
+        
         final PropertyValue[] filterData = {
             // Image resolution settings don't seem to affect file size
             // in practice.
@@ -216,8 +204,54 @@ public class BatchPdfConvert {
         };
         
         // See http://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1frame_1_1XStorable.html
-	final PropertyValue[] saveOptions = {
+        final PropertyValue[] saveOptions = {
             makePropVal("FilterName", "impress_pdf_Export"), 
+            makePropVal("FilterData", filterData)
+        };
+        
+        try {
+            storable.storeToURL(outputUrl, saveOptions);
+        } catch (com.sun.star.io.IOException ex) {
+            ex.printStackTrace(System.err);
+        }
+    }
+    
+    public static void loadAndConvertOdp(String inputPath, String outputPath) {
+        final XDesktop desktop = getDesktop();
+        try {
+            final String inputUrl =
+                    (new File(inputPath)).toURI().toURL().toString();
+            final String outputUrl =
+                    (new File(outputPath)).toURI().toURL().toString();
+            final XComponent comp = loadDocument(inputUrl, desktop);
+            removeShadows(comp);
+            exportDocument(comp, outputUrl);
+            closeDocument(comp);
+        } catch (java.io.IOException ex) {
+            Logger.getLogger(BatchPdfConvert.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+        System.out.println("Done.");
+    }
+    
+    public static void createAndConvertText(String outputUrl) {
+        final XDesktop desktop = getDesktop();
+        final XTextDocument textDoc = createTextDocument(desktop);
+        
+        textDoc.getText().setString("Hello world!");
+
+	final XStorable storable = (XStorable)
+	    queryInterface(XStorable.class, textDoc);
+
+	System.out.println("xStorable: " + storable);
+
+        final PropertyValue[] filterData = {
+                makePropVal("Watermark", "watermark test")
+        };
+        
+        // See http://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1frame_1_1XStorable.html
+	final PropertyValue[] saveOptions = {
+            makePropVal("FilterName", "writer_pdf_Export"),
             makePropVal("FilterData", filterData)
         };
         
@@ -225,43 +259,6 @@ public class BatchPdfConvert {
 	    storable.storeToURL(outputUrl, saveOptions);
 	} catch (com.sun.star.io.IOException ex) {
 	    ex.printStackTrace(System.err);
-	}
-        
-        closeDocument(xComp);
-        System.out.println("Done.");
-    }
-    
-    public static void createAndConvertText() {
-        final XDesktop desktop = getDesktop();
-        final XTextDocument textDoc = createTextDocument(desktop);
-        
-        textDoc.getText().setString("Hello world!");
-        
-        //final XComponent xComp = loadDocument("file:///home/pont/Untitled 1.odt", desktop);
-        //final XTextDocument textDoc = queryInterface(XTextDocument.class, xComp);
- 
-	final XStorable storable = (XStorable)
-	    queryInterface(XStorable.class, textDoc);
-
-	System.out.println("xStorable: " + storable);
- 
-	final String outputUrlString = "file:///home/pont/exported.pdf";
-        
-        final PropertyValue[] filterData = {
-                makePropVal("Watermark", "Wibble")
-        };
-        
-        // See http://api.libreoffice.org/docs/idl/ref/interfacecom_1_1sun_1_1star_1_1frame_1_1XStorable.html
-	final PropertyValue[] saveOptions = {
-            makePropVal("FilterName", "writer_pdf_Export"),  // or impress_pdf_Export, etc.
-            makePropVal("FilterData", filterData)
-        };
-        
-	try {
-	    storable.storeToURL(outputUrlString, saveOptions);
-	} catch (com.sun.star.io.IOException ex) {
-	    ex.printStackTrace(System.err);
-	    return;
 	}
     }
     
