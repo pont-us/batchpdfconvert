@@ -1,3 +1,10 @@
+/**
+ * batchpdfconvert
+ * 
+ * Copyright 2017 Pontus Lurcock. Released under the MIT License;
+ * see the file LICENSE for details.
+*/
+
 package net.talvi.batchpdfconvert;
 
 import com.sun.star.beans.PropertyValue;
@@ -33,13 +40,18 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *
+ * 
+ * 
  * @author pont
  */
 public class BatchPdfConvert {
 
     public static XDesktop getDesktop() {
         try {
+            // Bootstrap will throw "java.lang.UnsatisfiedLinkError: no jpipe in java.library.path"
+            // if -Djava.library.path=/usr/lib/libreoffice/program/ is not
+            // specified at runtime -- might be worth explicitly catching
+            // this and advising the user accordingly.
             final XComponentContext context = Bootstrap.bootstrap();
             final XMultiComponentFactory mcf = context.getServiceManager();
             if (mcf != null) {
@@ -111,10 +123,10 @@ public class BatchPdfConvert {
             final XComponent disposable =
                     (XComponent) queryInterface(XComponent.class, model);
             // Proper document so close if possible.
-            final XCloseable xCloseable =
+            final XCloseable closeable =
                     (XCloseable) queryInterface(XCloseable.class, model);
             
-            if (xCloseable != null) {
+            if (closeable != null) {
                 System.out.println("Closeable.");
                 try {
                     // https://www.openoffice.org/api/docs/common/ref/com/sun/star/util/XCloseable.html
@@ -139,7 +151,7 @@ public class BatchPdfConvert {
                     // unlikely anyway in a conversion process where we're
                     // just loading, saving, and closing a document.
                     
-                    xCloseable.close(true);
+                    closeable.close(true);
                 } catch(CloseVetoException closeVeto) {
                     System.out.println("Veto!");
                     // Attempting to force things with a dispose here would 
