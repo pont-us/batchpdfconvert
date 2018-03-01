@@ -1,9 +1,6 @@
 batchpdfconvert
 ===============
 
-Copyright 2017 Pontus Lurcock. Released under the MIT License;
-see the file LICENSE for details.
-
 Rationale
 ---------
 
@@ -54,3 +51,15 @@ Usage
 -----
 
     java -Djava.library.path=/usr/lib/libreoffice/program/ -jar batchpdfconvert.jar input.ppt output.pdf
+
+Author and license
+------------------
+
+Copyright 2017, 2018 Pontus Lurcock, pont at talvi dot net.
+
+batchpdfconvert is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+See the file LICENSE for details.
