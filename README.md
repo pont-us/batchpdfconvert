@@ -10,23 +10,32 @@ Rationale
 I sometimes come across PowerPoint files containing useful information
 that I'd like to keep, but PowerPoint is not a good archival format. In
 order to ensure future readability I prefer to convert these files to
-PDF. In addition, many PowerPoint files are unnecessarily large, because
-they include excessively high-resolution bitmap graphics. Usually the
-text is the content I'm mainly interested in, so I prefer to reduce the
-resolution and increase the compression level of any images when
-converting to PDF.
+PDF. The conversion can be done manually be opening a PowerPoint file in
+LibreOffice and exporting it as a PDF, but this becomes inconvenient
+when many files need to be converted; there are also some minor
+tweaks I like to perform before the conversion, which would be tedious
+to do by hand.
 
-The conversion can be done manually be opening a PowerPoint file in
-LibreOffice and exporting it as a PDF, but this becomes inconvenient when
-many files need to be converted. Additionally, LibreOffice sometimes
-converts text with the "shadow" decoration to two separate, overlapping,
-selectable text objects. Some PDF readers make it impossible to select
-just one of these text lines, so any text copied out of the PDF has each
-word, or each character, duplicated.
+`batchpdfconvert` provides a command-line interface to the LibreOffice
+conversion functionality via the UNO API. It makes the following
+modifications to the files when saving:
 
-batchpdfconvert provides a command-line interface to the LibreOffice
-conversion functionality via the UNO API. Additionally, it removes the
-shadow effect throughout the file before performing the conversion.
+- Many PowerPoint files are unnecessarily large, because they include
+  excessively high-resolution bitmap graphics. Usually the text is the
+  content I'm mainly interested in, so `batchpdfconvert` exports
+  all images to JPEGs with an 80% compression ratio.
+
+- LibreOffice sometimes converts text with the "shadow" decoration to
+  two separate, overlapping, selectable text objects. Some PDF readers
+  make it impossible to select just one of these text lines, so any
+  text copied out of the PDF has each word, or each character,
+  duplicated. `batchpdfconvert` therefore removes the shadow effect
+  throughout the file before performing the conversion.
+
+- Occasionally I find an object in a PowerPoint file with a negative
+  x position, so that its leftmost portion is clipped off the edge of
+  the slide. `batchpdfconvert` finds such objects and changes the x
+  position to 0, moving them onto the page.
 
 Installation
 ------------
@@ -34,14 +43,14 @@ Installation
 batchpdfconvert is developed in Java as a Netbeans project with a build
 file in Ant. Netbeans is not required to build the project.
 batchpdfconvert depends on various LibreOffice jars, which are provided
-by the `libreoffice-java-common` and `uno` packages in Ubuntu.
+by the `libreoffice-java-common` and `ure` packages in Ubuntu.
 
-    sudo apt install openjdk-8-jdk uno libreoffice-java-common ant
+    sudo apt install openjdk-8-jdk ure libreoffice-java-common ant
     ant fatjar
+
+Package `ure` also provides `/usr/lib/libreoffice/program/libjpipe.so`.
 
 Usage
 -----
 
     java -Djava.library.path=/usr/lib/libreoffice/program/ -jar batchpdfconvert.jar input.ppt output.pdf
-
-[Package ure contains /usr/lib/libreoffice/program/libjpipe.so]

@@ -1,12 +1,25 @@
 /**
- * batchpdfconvert
+ *  Copyright 2017, 2018 Pontus Lurcock.
  * 
- * Copyright 2017 Pontus Lurcock. Released under the MIT License;
- * see the file LICENSE for details.
+ *  This file is part of batchpdfconvert.
+ *
+ *  batchpdfconvert is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ * 
+ *  batchpdfconvert is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ * 
+ *  You should have received a copy of the GNU General Public License
+ *  along with batchpdfconvert.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package net.talvi.batchpdfconvert;
 
+import com.sun.star.awt.Point;
 import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.PropertyVetoException;
 import com.sun.star.beans.UnknownPropertyException;
@@ -48,7 +61,8 @@ public class BatchPdfConvert {
 
     public static XDesktop getDesktop() {
         try {
-            // Bootstrap will throw "java.lang.UnsatisfiedLinkError: no jpipe in java.library.path"
+            // Bootstrap will throw
+            // "java.lang.UnsatisfiedLinkError: no jpipe in java.library.path"
             // if -Djava.library.path=/usr/lib/libreoffice/program/ is not
             // specified at runtime -- might be worth explicitly catching
             // this and advising the user accordingly.
@@ -174,17 +188,23 @@ public class BatchPdfConvert {
         
         for (int i=0; i<xDPS.getDrawPages().getCount(); i++) {
             try {
-                final XDrawPage page = queryInterface(XDrawPage.class, xDPi.getByIndex(i));
-                final XIndexAccess dpia = queryInterface(XIndexAccess.class, page);
+                final XDrawPage page = queryInterface(XDrawPage.class,
+                        xDPi.getByIndex(i));
+                final XIndexAccess dpia = queryInterface(XIndexAccess.class,
+                        page);
                 for (int j=0; j<page.getCount(); j++) {
-                    XShape shape = queryInterface(XShape.class, dpia.getByIndex(j));
-                    // System.out.println("Shape: "+shape.getShapeType());
-                    // com.sun.star.presentation.TitleTextShape
-                    // com.sun.star.presentation.SubtitleShape
+                    final XShape shape = queryInterface(XShape.class,
+                            dpia.getByIndex(j));
+                    final int xPos = shape.getPosition().X;
+                    if (xPos < 0) {
+                        final int yPos = shape.getPosition().Y;
+                        shape.setPosition(new Point(0, yPos));
+                    }
                     //if ("com.sun.star.presentation.TitleTextShape".equals(shape.getShapeType())) {
                     final XPropertySet shapeProps = (XPropertySet)
                             queryInterface(XPropertySet.class, shape);
-                    final XPropertySetInfo psi = shapeProps.getPropertySetInfo();
+                    final XPropertySetInfo psi =
+                            shapeProps.getPropertySetInfo();
                     if (psi.hasPropertyByName("Shadow")) {
                         shapeProps.setPropertyValue("Shadow", Boolean.FALSE);
                     }
@@ -240,7 +260,8 @@ public class BatchPdfConvert {
             exportDocument(comp, outputUrl);
             closeDocument(comp);
         } catch (java.io.IOException ex) {
-            Logger.getLogger(BatchPdfConvert.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(BatchPdfConvert.class.getName()).log(
+                    Level.SEVERE, null, ex);
             System.exit(1);
         }
         System.out.println("Done.");
